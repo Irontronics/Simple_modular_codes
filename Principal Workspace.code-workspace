@@ -6,6 +6,10 @@
 		},
 		{
 			"path": "32Bits_FloatingTypeReg_modbus"
+		},
+		{
+			"name": "Word_32bits",
+			"path": "Word_32bits"
 		}
 	]
 }
