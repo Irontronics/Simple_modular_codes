@@ -1,7 +1,10 @@
 {
 	"folders": [
 		{
-			"name": "32Bits_FloatingTypeReg_modbus",
+			"name": "Rotatory_Sensor_Futek",
+			"path": "Rotatory_Sensor_Futek"
+		},
+		{
 			"path": "32Bits_FloatingTypeReg_modbus"
 		}
 	]
