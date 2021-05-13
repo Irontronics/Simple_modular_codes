@@ -18,6 +18,10 @@
 		{
 			"name": "monitor and command-modbus",
 			"path": "monitor and command-modbus"
+		},
+		{
+			"name": "testing_3programs",
+			"path": "..\\..\\..\\..\\PlatformIO\\Projects\\testing_3programs"
 		}
 	]
 }
