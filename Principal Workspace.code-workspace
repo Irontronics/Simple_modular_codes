@@ -22,6 +22,10 @@
 		{
 			"name": "testing_3programs",
 			"path": "..\\..\\..\\..\\PlatformIO\\Projects\\testing_3programs"
+		},
+		{
+			"name": "BancoDePruebas_CIATEQ",
+			"path": "..\\..\\..\\..\\PlatformIO\\Projects\\BancoDePruebas_CIATEQ"
 		}
 	]
 }
