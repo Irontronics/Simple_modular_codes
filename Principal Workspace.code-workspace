@@ -26,6 +26,10 @@
 		{
 			"name": "BancoDePruebas_CIATEQ",
 			"path": "..\\..\\..\\..\\PlatformIO\\Projects\\BancoDePruebas_CIATEQ"
+		},
+		{
+			"name": "Proyecto_residencia_CIATEQ",
+			"path": "Proyecto_residencia_CIATEQ"
 		}
 	]
 }
