@@ -30,6 +30,10 @@
 		{
 			"name": "Proyecto_residencia_CIATEQ",
 			"path": "Proyecto_residencia_CIATEQ"
+		},
+		{
+			"name": "Test_writting_registers",
+			"path": "..\\..\\..\\..\\PlatformIO\\Projects\\Test_writting_registers"
 		}
 	]
 }

@@ -3,11 +3,18 @@
 #include <Ethernet.h>
 #include <SPI.h>
 
+#define  CH1 7  //definir salida control  CH1 para SSR 
+#define  CH2 6  //definir salida control  CH2 para SSR 
+
+
+
 //variables para el tiempo
 bool tiempo_flag=false; 
 unsigned long currentMillis =0; 
 unsigned long previousMilis = 0; 
-unsigned int interval = 100; 
+//unsigned int interval = 100; 
+
+void tiempo(unsigned int a);
 
 //variable de prueba para dirección modbus 
 int test1 = 858; 
@@ -39,7 +46,11 @@ long LSB_W_VL2_Set; //registro de velocidad seteada 2
 long MSB_W_ACC_Set; //Tomará ambos byte de MSB 
 long LSB_W_ACC_Set; //Tomará ambos byte de LSB 
 long MSB_W_DEC_Set; //Tomará ambos byte de MSB 
-long LSB_W_DEC_Set; //Tomará ambos byte de LSB 
+long LSB_W_DEC_Set; //Tomará ambos byte de LSB
+word time1_set; 
+word time2_set; 
+bool dir_set;  
+bool op_mode_set; 
 
 long MSB_W_VBUS; //Tomará ambos byte de MSB 
 long LSB_W_VBUS; //Tomará ambos byte de LSB 
@@ -69,6 +80,8 @@ IPAddress subnet(255, 255, 255, 0);
 
 void setup() {
  Serial.begin(9600);
+ pinMode(CH1, OUTPUT); 
+ pinMode(CH2, OUTPUT);
  pinMode(LED_BUILTIN, OUTPUT); //led for testing 
 //Serial.println("hola");
   //*initialize ethernet shield 
@@ -87,8 +100,8 @@ if(command == 1){ //Programa modo generador modbus Servodrive
  //  Serial.println(firstimeGen); 
 
   if(firstimeGen){ //si es primera vez que ingresa a modo generador 
-     Poller_2(); // sacar valores setteados de velocidad y aceleración 
-     Mb.MbmRun();
+    Poller_2(); // sacar valores setteados de velocidad y aceleración 
+    Mb.MbmRun();
   }
   if(!firstimeGen and !start and !done) { // si no es primera vez y no vamos a organizar datos, entonces (monitoreo general modbus )
    // Serial.println("estoy mon modbus general");
@@ -103,19 +116,20 @@ if(command == 1){ //Programa modo generador modbus Servodrive
       long result3 = organizar_w(MSB_W_ACC_Set, LSB_W_ACC_Set); //velocidad2 setteada en servo
       long result4 = organizar_w(MSB_W_DEC_Set, LSB_W_DEC_Set); //velocidad2 setteada en servo
 
-      mensaje1 = String(result1) + "M" + String(result2) + "N" + String(result3) + "L" + String(result4) + "K" + "\n";
+      mensaje1 = String(result1) + "M" + String(result2) + "N" + String(result3) + "L" + String(result4) + "K" + String(time1_set) + "J" + String(time2_set) + "I" + String(dir_set) + "H" + String(op_mode_set) + "G" + "\n";
       Serial.print(mensaje1); //lo mandamos a visual studio para mostrar en HMI 
-      tiempo(); //le damos un pequeño tiempo de refresco 
+      tiempo(1500); //le damos un pequeño tiempo de refresco 
       firstimeGen = false; //false por que ya no es primera  vez 
       done=false; //reset de variables 
   }
 
 if(start and (!comand_in) and !firstimeGen and !done){ //cuando se terminó de tomar lectura a registros modbus, organizar string para mandar a visual studio 
 long result1= organizar_w(MSB_W_VL, LSB_W_VL);
-long result2 = organizar_w(MSB_W_VBUS, LSB_W_VBUS); 
-mensaje1 = String(result1) + "Z" + String(STATUS_drv) + "Y"  + String(STATUS_stop) + "X" + String(result2) + "W" + String(Temp_DRV) + "V" + "\n"; 
+//long result2 = organizar_w(MSB_W_VBUS, LSB_W_VBUS); 
+//mensaje1 = String(result1) + "Z" + String(STATUS_drv) + "Y"  + String(STATUS_stop) + "X" + String(result2) + "W" + String(Temp_DRV) + "V" + "\n"; 
+mensaje1 = String(result1) + "Z" + String(STATUS_drv) + "Y"  + String(STATUS_stop) + "X" + "\n"; 
 Serial.print(mensaje1); //lo mandamos a visual studio para mostrar en HMI 
-tiempo(); //le damos un pequeño tiempo de refresco 
+tiempo(80); //le damos un pequeño tiempo de refresco 
 start = false; //flag para volver a tomar lecturas de modbus  
 }
 
@@ -172,6 +186,9 @@ void serialEvent (){ // lee la cadena proveniente de visual studio HMI
     else if (inputString =="B2"){ //Comando para inicializar modo generador //entro a la ventana de modo generador, revisar velocidades y aceleraciones 
       //va a correr el programa de generador, entonces, en primer instancia y solo por una vez, se debe de tomar lectura de registros de velocidad y aceleración, entonces: 
       firstimeGen = true; //primera vez 
+      digitalWrite(CH2, HIGH); //settear freno
+      tiempo(300);
+      digitalWrite(CH2, LOW); //
       inputString ="";
       command = 1;  
     }
@@ -189,17 +206,23 @@ void serialEvent (){ // lee la cadena proveniente de visual studio HMI
       start = true ;  //deja de meterse a la etapa de modbus, pero sigue imprimiendo valores 
       comand_in = true;   
     }
-        else if (inputString =="F2"){  // sin activación, se pierde comunicación con software de usuario 
-      inputString ="";
-      start = false ;  //deja de meterse a la etapa de modbus, pero sigue imprimiendo valores 
-      comand_in = false;   
+    else if (inputString =="F2"){  // sin activación, se pierde comunicación con software de usuario 
+    inputString ="";
+    start = false ;  //deja de meterse a la etapa de modbus, pero sigue imprimiendo valores 
+    comand_in = false;   
     }
 
+    }//primer elsif
+    else if (inputString.length() >= 8){ //de lo contrario si cadena recibida es larga (datos de settings modbus)
+  digitalWrite(LED_BUILTIN, HIGH);  
+  tiempo(1200);                  
+  digitalWrite(LED_BUILTIN, LOW);   
+  inputString ="";
     }
-    else{ //de lo contrario si cadena recibida es larga (datos de settings modbus)
 
-    }
-    } //validación de cadena recibida*** 
+
+
+    } //String Complete* 
   } //función de dato serial recibido 
 
 // ? Inico de poller monitoreo modbus 
@@ -215,7 +238,7 @@ void serialEvent (){ // lee la cadena proveniente de visual studio HMI
 
   if(acc ==  240){ 
     MSB_W_VL = Mb.MbData[0];
-    LSB_W_VL = Mb.MbData[1];
+    LSB_W_VL = Mb.MbData[1]; //VELOCIDAD MOTOR 
     }
 
     if(acc == 360){
@@ -235,30 +258,32 @@ void serialEvent (){ // lee la cadena proveniente de visual studio HMI
 
     if(acc == 720){
     STATUS_stop = Mb.MbData[0];
-    }
-    
-    if(acc == 840){
-    Mb.MbData[0] = 0;  
-    Mb.MbData[1] = 0; 
-    Mb.Req(MB_FC_READ_REGISTERS,  806,2,0); //Solicitud de lectura voltaje de potencia 
-  }
-
-  if(acc == 960){
-    MSB_W_VBUS = Mb.MbData[0]; 
-    LSB_W_VBUS = Mb.MbData[1];
-    }
-
-  if(acc == 1080){
-    Mb.MbData[0] = 0; 
-    Mb.Req(MB_FC_READ_REGISTERS,  1749,1,0); //Solicitud de lectura de temperatura driver 
-  }
-
-  if(acc == 1200){
-    Temp_DRV = Mb.MbData[0]; 
     acc =0; 
     start = true;  //fin 
+    }
+    
+  //  if(acc == 840){
+  //  Mb.MbData[0] = 0;  
+  //  Mb.MbData[1] = 0; 
+  //  Mb.Req(MB_FC_READ_REGISTERS,  806,2,0); //Solicitud de lectura voltaje de potencia 
+  //}
+
+  //if(acc == 960){
+    //MSB_W_VBUS = Mb.MbData[0]; 
+    //LSB_W_VBUS = Mb.MbData[1];
+   // }
+
+  //if(acc == 1080){
+  //  Mb.MbData[0] = 0; 
+  //  Mb.Req(MB_FC_READ_REGISTERS,  1749,1,0); //Solicitud de lectura de temperatura driver 
+ // }
+
+  //if(acc == 1200){
+   // Temp_DRV = Mb.MbData[0]; 
+   // acc =0; 
+   // start = true;  //fin 
    
-  }
+ // }
 
 
 } //Poller_monitoreo general 
@@ -278,12 +303,11 @@ void serialEvent (){ // lee la cadena proveniente de visual studio HMI
   }
 
   if(acc ==  240){ 
-    MSB_W_VL_Set = Mb.MbData[0]; //velocidad 1 
+    MSB_W_VL_Set = Mb.MbData[0]; //velocidad 1  y velocidad 2 
     LSB_W_VL_Set = Mb.MbData[1];
     MSB_W_VL2_Set = Mb.MbData[2];
     LSB_W_VL2_Set = Mb.MbData[3];
-   // acc =0;
-   // done = true; //FLAG DE TERMINACIÓN LECTURA REG
+
     }
 
   if(acc ==360){  
@@ -293,7 +317,7 @@ void serialEvent (){ // lee la cadena proveniente de visual studio HMI
   }
 
   if(acc ==  480){ 
-    MSB_W_ACC_Set = Mb.MbData[0]; //velocidad 1 
+    MSB_W_ACC_Set = Mb.MbData[0]; //Acceleración 
     LSB_W_ACC_Set = Mb.MbData[1];
     }
 
@@ -304,11 +328,56 @@ void serialEvent (){ // lee la cadena proveniente de visual studio HMI
   }
 
   if(acc ==  720){ 
-    MSB_W_DEC_Set = Mb.MbData[0]; //velocidad 1 
+    MSB_W_DEC_Set = Mb.MbData[0]; 
     LSB_W_DEC_Set = Mb.MbData[1];
-    acc =0;
-    done = true; //FLAG DE TERMINACIÓN LECTURA REG
+    //acc =0;
+    //done = true; //Desaceleración 
     }
+
+  if(acc ==  840){ 
+  Mb.MbData[0] = 0; 
+  Mb.Req(MB_FC_READ_REGISTERS,  755,1,0);
+    }
+
+  if(acc ==  960){ 
+    time1_set = Mb.MbData[0]; 
+   // acc =0;
+   // done = true; //Time1 set  
+    }
+
+  if(acc ==  1080){ 
+  Mb.MbData[0] = 0; 
+  Mb.Req(MB_FC_READ_REGISTERS,  757,1,0);
+    }
+
+  if(acc ==  1200){ 
+    time2_set = Mb.MbData[0]; 
+   // acc =0;
+   // done = true; //Time2 set 
+    }
+
+  if(acc ==  1320){ 
+  Mb.MbData[0] = 0; 
+  Mb.Req(MB_FC_READ_REGISTERS,  235,1,0);
+    }
+
+  if(acc ==  1440){ 
+    dir_set = Mb.MbData[0]; 
+   //acc =0;
+   //done = true; //Dirección set 
+    }
+
+  if(acc ==  1560){ 
+  Mb.MbData[0] = 0; 
+  Mb.Req(MB_FC_READ_REGISTERS,  751,1,0);
+    }
+
+  if(acc ==  1680){ 
+    op_mode_set = Mb.MbData[0]; 
+   acc =0;
+   done = true; //Dirección set 
+    }
+
 
 
 } //PolLer2 
@@ -320,11 +389,12 @@ long organizar_w(long a, long b){
   return num2; 
 }
 
-void tiempo(){ //función de tiempo
+
+void tiempo(unsigned int a){ //función de tiempo
   currentMillis = millis(); 
   previousMilis=currentMillis; 
   do{
-  if(currentMillis - previousMilis  >= interval ){
+  if(currentMillis - previousMilis  >= a ){
     previousMilis = currentMillis;
     tiempo_flag = true; 
     }
