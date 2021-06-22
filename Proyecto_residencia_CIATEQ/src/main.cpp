@@ -6,6 +6,22 @@
 #define  CH1 7  //definir salida control  CH1 para SSR 
 #define  CH2 6  //definir salida control  CH2 para SSR 
 
+//variables para separar ajustes
+bool finish1, finish2, finish3, finish4, finish5, finish6, finish7,finish8;  //estos booleanos 
+String one, two, three, four, five, six, seven, eight;  //para el dato individual 
+byte num1;
+long num2; 
+long num3; 
+long num4; 
+long num5; 
+word num6;
+word num7; 
+word num8; 
+
+bool iniciar_set = false;
+
+void acondicionar_variables_a_modbus();
+void separar_ajustes_modbus(String Str_complete );
 
 
 //variables para el tiempo
@@ -64,6 +80,7 @@ bool start = false;  //flag para iniciar monitoreo modbus o dar tiempo para mand
 void tiempo(); //funcion de tiempo, no es de modbus 
 void Poller(); // TODO:  se debe de definir función antes 
 void Poller_2();
+void Poller_3();
 long organizar_w(long a, long b);//funcion de organización word , no es de modbus 
 
 //Creación de objeto Mb
@@ -84,7 +101,7 @@ void setup() {
  pinMode(CH2, OUTPUT);
  pinMode(LED_BUILTIN, OUTPUT); //led for testing 
 //Serial.println("hola");
-  //*initialize ethernet shield 
+  //*initialize ethernet shield , con este activo, es cuando no hace match a veces con el com serial. 
   Ethernet.begin(mac, ip, gateway, subnet); 
 
 //*Server - Slave address: //IP SERVO DRIVE
@@ -105,36 +122,40 @@ if(command == 1){ //Programa modo generador modbus Servodrive
   }
   if(!firstimeGen and !start and !done) { // si no es primera vez y no vamos a organizar datos, entonces (monitoreo general modbus )
    // Serial.println("estoy mon modbus general");
+   //firstimeGEN y done son iguales, ambas variables son para primera vez, estas no deben de estar activas, entonces start si para iniciar monitoreo normal 
     Poller(); 
     Mb.MbmRun(); 
   }
 
 
   if(done){  // Don
+     // long result1 = 45193; 
       long result1= organizar_w(MSB_W_VL_Set, LSB_W_VL_Set); //velocidad1 setteada en servo 
       long result2 = organizar_w(MSB_W_VL2_Set, LSB_W_VL2_Set); //velocidad2 setteada en servo
       long result3 = organizar_w(MSB_W_ACC_Set, LSB_W_ACC_Set); //velocidad2 setteada en servo
       long result4 = organizar_w(MSB_W_DEC_Set, LSB_W_DEC_Set); //velocidad2 setteada en servo
 
-      mensaje1 = String(result1) + "M" + String(result2) + "N" + String(result3) + "L" + String(result4) + "K" + String(time1_set) + "J" + String(time2_set) + "I" + String(dir_set) + "H" + String(op_mode_set) + "G" + "\n";
+      mensaje1 = String(result1) + "M" + String(result2) + "N" + String(result3) + "L" + String(result4) + "K" + String(time1_set) + "J" + String(time2_set) + "I" + String(dir_set) + "H" + String(op_mode_set) + "G" ;
+     // mensaje1="123M456N789L2K5J12I0H1G";
       Serial.print(mensaje1); //lo mandamos a visual studio para mostrar en HMI 
-      tiempo(1500); //le damos un pequeño tiempo de refresco 
+      tiempo(100); //le damos un pequeño tiempo de refresco 
+      //mensaje1 = ""; 
       firstimeGen = false; //false por que ya no es primera  vez 
       done=false; //reset de variables 
   }
 
-if(start and (!comand_in) and !firstimeGen and !done){ //cuando se terminó de tomar lectura a registros modbus, organizar string para mandar a visual studio 
+if(start and !firstimeGen and !done and !comand_in){ //cuando se terminó de tomar lectura a registros modbus, organizar string para mandar a visual studio 
 long result1= organizar_w(MSB_W_VL, LSB_W_VL);
 //long result2 = organizar_w(MSB_W_VBUS, LSB_W_VBUS); 
 //mensaje1 = String(result1) + "Z" + String(STATUS_drv) + "Y"  + String(STATUS_stop) + "X" + String(result2) + "W" + String(Temp_DRV) + "V" + "\n"; 
 mensaje1 = String(result1) + "Z" + String(STATUS_drv) + "Y"  + String(STATUS_stop) + "X" + "\n"; 
 Serial.print(mensaje1); //lo mandamos a visual studio para mostrar en HMI 
-tiempo(80); //le damos un pequeño tiempo de refresco 
+//mensaje1 = ""; 
+tiempo(250); //le damos un pequeño tiempo de refresco 
 start = false; //flag para volver a tomar lecturas de modbus  
 }
 
 }
-//} //fin programa modo motor 
 
 else if (command == 2) { //en espera de selección 
   digitalWrite(LED_BUILTIN, HIGH);   
@@ -201,22 +222,26 @@ void serialEvent (){ // lee la cadena proveniente de visual studio HMI
       digitalWrite(LED_BUILTIN, LOW);
       command = 0;  
     }
-    else if (inputString =="E2"){  // sin activación, se pierde comunicación con software de usuario 
+    else if (inputString =="E2"){  // 
+      comand_in= true ;  //deja de meterse a la etapa de modbus, no imprime valores   
       inputString ="";
-      start = true ;  //deja de meterse a la etapa de modbus, pero sigue imprimiendo valores 
-      comand_in = true;   
     }
-    else if (inputString =="F2"){  // sin activación, se pierde comunicación con software de usuario 
+    else if (inputString =="F2"){  // 
+    comand_in = false;
     inputString ="";
-    start = false ;  //deja de meterse a la etapa de modbus, pero sigue imprimiendo valores 
-    comand_in = false;   
+    start = false ;  //Reanuda monitoreo modbus en aplicación 
+    //comand_in = false;   
     }
+    
 
     }//primer elsif
     else if (inputString.length() >= 8){ //de lo contrario si cadena recibida es larga (datos de settings modbus)
-  digitalWrite(LED_BUILTIN, HIGH);  
-  tiempo(1200);                  
-  digitalWrite(LED_BUILTIN, LOW);   
+
+    separar_ajustes_modbus(inputString); //a separar ajustes 
+    acondicionar_variables_a_modbus(); 
+  //digitalWrite(LED_BUILTIN, HIGH);  
+  //tiempo(2500);                  
+  //digitalWrite(LED_BUILTIN, LOW);   
   inputString ="";
     }
 
@@ -294,7 +319,7 @@ void serialEvent (){ // lee la cadena proveniente de visual studio HMI
   delay(1);
   acc = acc + 1; 
 
-  if(acc ==120){ //!Mete ruido cuando se coloca una velocidad alta (300 + 200) ok , 
+  if(acc ==200){ //!Mete ruido cuando se coloca una velocidad alta (300 + 200) ok , 
     Mb.MbData[0] = 0; 
     Mb.MbData[1] = 0;
     Mb.MbData[2] = 0;
@@ -302,7 +327,7 @@ void serialEvent (){ // lee la cadena proveniente de visual studio HMI
     Mb.Req(MB_FC_READ_REGISTERS,  758,4,0); 
   }
 
-  if(acc ==  240){ 
+  if(acc ==  400){ 
     MSB_W_VL_Set = Mb.MbData[0]; //velocidad 1  y velocidad 2 
     LSB_W_VL_Set = Mb.MbData[1];
     MSB_W_VL2_Set = Mb.MbData[2];
@@ -310,69 +335,69 @@ void serialEvent (){ // lee la cadena proveniente de visual studio HMI
 
     }
 
-  if(acc ==360){  
+  if(acc ==600){  
     Mb.MbData[0] = 0; 
     Mb.MbData[1] = 0;
     Mb.Req(MB_FC_READ_REGISTERS,  218,2,0); 
   }
 
-  if(acc ==  480){ 
+  if(acc ==  800){ 
     MSB_W_ACC_Set = Mb.MbData[0]; //Acceleración 
     LSB_W_ACC_Set = Mb.MbData[1];
     }
 
-  if(acc ==600){  
+  if(acc ==1000){  
     Mb.MbData[0] = 0; 
     Mb.MbData[1] = 0;
     Mb.Req(MB_FC_READ_REGISTERS,  232,2,0); 
   }
 
-  if(acc ==  720){ 
+  if(acc ==  1200){ 
     MSB_W_DEC_Set = Mb.MbData[0]; 
     LSB_W_DEC_Set = Mb.MbData[1];
     //acc =0;
     //done = true; //Desaceleración 
     }
 
-  if(acc ==  840){ 
+  if(acc ==  1400){ 
   Mb.MbData[0] = 0; 
   Mb.Req(MB_FC_READ_REGISTERS,  755,1,0);
     }
 
-  if(acc ==  960){ 
+  if(acc ==  1600){ 
     time1_set = Mb.MbData[0]; 
    // acc =0;
    // done = true; //Time1 set  
     }
 
-  if(acc ==  1080){ 
+  if(acc ==  1800){ 
   Mb.MbData[0] = 0; 
   Mb.Req(MB_FC_READ_REGISTERS,  757,1,0);
     }
 
-  if(acc ==  1200){ 
+  if(acc ==  2000){ 
     time2_set = Mb.MbData[0]; 
    // acc =0;
    // done = true; //Time2 set 
     }
 
-  if(acc ==  1320){ 
+  if(acc ==  2200){ 
   Mb.MbData[0] = 0; 
   Mb.Req(MB_FC_READ_REGISTERS,  235,1,0);
     }
 
-  if(acc ==  1440){ 
+  if(acc ==  2400){ 
     dir_set = Mb.MbData[0]; 
    //acc =0;
    //done = true; //Dirección set 
     }
 
-  if(acc ==  1560){ 
+  if(acc ==  2600){ 
   Mb.MbData[0] = 0; 
   Mb.Req(MB_FC_READ_REGISTERS,  751,1,0);
     }
 
-  if(acc ==  1680){ 
+  if(acc ==  2800){ 
     op_mode_set = Mb.MbData[0]; 
    acc =0;
    done = true; //Dirección set 
@@ -405,3 +430,149 @@ void tiempo(unsigned int a){ //función de tiempo
   tiempo_flag=false;  
   }
 
+void separar_ajustes_modbus(String Str_complete){
+  char b; //variable de concatenacion 
+  int a = Str_complete.length();   //se determina la longintud de String 
+  
+  for(int i =0;i <= a;i++){ //hacemos un recorrido por los caracteres del string frame 
+    b= Str_complete.charAt(i);  //le damos el valor de dicho caracter a b 
+
+    if(b == 'A' or finish1){ //si se encuentra A, se termina el paquete 1 o si Flag esta activa es por que ya pasó por ahí 
+        finish1 = true; //flag de que ya pasó por paquete1 
+        if( b == 'B' or finish2){ //si se encuentra B, se termina el paquete 2 o si Flag esta activa es por que ya pasó por ahí 
+          finish2 = true; //flag de que ya pasó por paquete2
+          if(b == 'C' or finish3){ //si se encuentra C, se termina el paquete 3 o si Flag esta activa es por que ya pasó por ahí 
+            finish3 = true; //flag de que ya pasó por paquete3
+            if(b == 'D' or finish4){
+              finish4 = true;
+              if(b == 'E' or finish5){
+                finish5=true;
+                if(b =='F' or finish6){
+                  finish6 = true;
+                  if(b == 'G' or finish7){
+                    finish7 = true;
+                    if(b == 'H' or finish8){
+                      finish8 = true;
+                    }
+                    else if (b != 'G'){ eight += b;} 
+
+                  } //if septimo paquete
+                  else if (b != 'F'){seven += b;}
+
+                } //if sexto paquete
+                else if (b!='E'){six += b;}
+
+              } //if quinto paquete
+              else if(b!= 'D'){five += b;}
+            } //if cuarto paquete
+            else if(b!= 'C'){four += b;}
+          }//if tercer paquete
+          else if(b!= 'B'){three += b;}
+
+        } //if segundo paquete
+        else if( b!= 'A'){two += b;}
+    
+    }//if 1er paquete
+    else {one += b;} //primer paquete
+
+} //for
+//b = ''; 
+Str_complete = ""; 
+} //funcion 
+
+void acondicionar_variables_a_modbus(){
+   num1 = one.toInt(); // SM_MODE DATA 
+   num2 = two.toInt();  
+   num3 = three.toInt(); 
+   num4 = four.toInt(); 
+   num5 = five.toInt(); 
+   num6 = six.toInt(); 
+   num7 = seven.toInt(); 
+   num8 = eight.toInt(); 
+   acc =0; 
+ 
+
+while(!iniciar_set){ //loop de configuración 
+    Poller_3(); 
+    Mb.MbmRun();
+}
+
+  finish1=false; 
+  finish2=false; 
+  finish3=false; 
+  finish4=false; 
+  finish5=false; 
+  finish6=false;  
+  finish7=false;
+  finish8=false; 
+iniciar_set = false; 
+num1 = 0; 
+num2 = 0; 
+num3 = 0; 
+num4 = 0; 
+num5 = 0; 
+num6 = 0; 
+num7 = 0; 
+num8 = 0; 
+one = '0'; 
+two = '0'; 
+three = '0'; 
+four = '0'; 
+five = '0'; 
+six = '0'; 
+seven = '0'; 
+eight = '0'; 
+
+}
+
+void Poller_3(){ //Configurar registros modbus 
+  delay(1);
+  acc = acc + 1; 
+
+ if(acc ==120 ){ 
+    Mb.MbData[0] = num1; 
+    Mb.Req(MB_FC_WRITE_MULTIPLE_REGISTERS,  751,1,0); //SM_MODE
+} 
+
+if (acc == 240){ 
+    Mb.MbData[0] =  num2;  
+    Mb.Req(MB_FC_WRITE_MULTIPLE_REGISTERS,  758,1,0);  //Velocidad 1 
+
+}
+
+if (acc == 360){ 
+    Mb.MbData[0] =  num3;  
+    Mb.Req(MB_FC_WRITE_MULTIPLE_REGISTERS,  760,1,0);  //Velocidad 2
+}
+
+if (acc == 480){ 
+    Mb.MbData[0] =  num4;  
+    Mb.Req(MB_FC_WRITE_MULTIPLE_REGISTERS,  218,1,0);  //ACC
+}
+
+if (acc == 600){ 
+    Mb.MbData[0] =  num5;  
+    Mb.Req(MB_FC_WRITE_MULTIPLE_REGISTERS,  232,1,0);  //DECC
+}
+
+if (acc == 720){ 
+    Mb.MbData[0] =  num6;  
+    Mb.Req(MB_FC_WRITE_MULTIPLE_REGISTERS,  755,1,0);  //Timer1 
+}
+
+if (acc == 840){ 
+    Mb.MbData[0] =  num7;  
+    Mb.Req(MB_FC_WRITE_MULTIPLE_REGISTERS,  757,1,0);  //Timer2
+}
+
+if (acc == 960){ 
+    Mb.MbData[0] =  num8;  
+    Mb.Req(MB_FC_WRITE_MULTIPLE_REGISTERS,  235,1,0);  //Sentido de giro
+    iniciar_set = true; 
+    acc=0; 
+}
+
+
+
+
+}
