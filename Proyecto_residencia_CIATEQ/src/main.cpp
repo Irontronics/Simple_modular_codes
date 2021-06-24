@@ -20,13 +20,17 @@ word num8;
 
 bool iniciar_set = false;
 bool iniciar_set2 = false;
+bool iniciar_set3 = false;
 bool stop_axis=false; 
+bool stop_move=false;
 bool COMANDO_AXIS=false; 
+bool COMANDO_MOVE=false; 
 bool command_in = false; 
 
 void acondicionar_variables_a_modbus();
 void separar_ajustes_modbus(String Str_complete );
 void activar_desactivar_potencia(); 
+void activar_desactivar_movimiento();
 
 //variables para el tiempo
 bool tiempo_flag=false; 
@@ -120,8 +124,25 @@ if(COMANDO_AXIS){ //Si el comando axis esta activo entonces
   command_in = false; 
   COMANDO_AXIS = false; 
   tiempo(380);
+  acc=0; 
 //  Serial.println("hab potencia222222222");
 }
+
+if(COMANDO_MOVE){ //Si el comando MOVE esta activo entonces 
+  acc=0;
+  activar_desactivar_movimiento();
+  command_in = false; 
+  COMANDO_MOVE = false; 
+  tiempo(380);
+  acc=0; 
+
+}
+
+
+
+
+
+
 }
 
 else if (command == 2) { //en espera de selección 
@@ -222,6 +243,24 @@ void serialEvent (){ // lee la cadena proveniente de visual studio HMI
 
     }
 
+    else if (inputString =="I2"){  //Iniciar movimiento
+    stop_move = true; //iniciar movimiento   
+    COMANDO_MOVE = true; //es un comando para el move 
+    command_in  = true; //bandera de flag de comando de control (detiene monitoreo momentaneamente)
+     tiempo(300);
+    inputString ="";
+ 
+    }
+
+    else if (inputString =="J2"){  //Detener movimiento  
+    stop_move = false; //desactivada potencia 
+    COMANDO_MOVE = true; //es un comando para el axis 
+    command_in  = true; //bandera de flag de comando de control 
+    tiempo(300);
+    inputString ="";
+
+    }
+
 
     }//primer elsif
     else if (inputString.length() >= 8){ //de lo contrario si cadena recibida es larga (datos de settings modbus)
@@ -313,6 +352,46 @@ if(acc == 550){
 
 } //PolLer2 
 
+// ? Inicio de poller4  
+  void Poller_4(){  //* lectura de configuración actual velocidad y aceleración
+  delay(1);
+  acc = acc + 1; 
+
+if(stop_move){ //si vamos a activar axis entonces
+if(acc == 350){
+    Mb.MbData[0] = 1; 
+    Mb.Req(MB_FC_WRITE_MULTIPLE_REGISTERS,  752,1,0); //SM.MOVE
+}
+if(acc == 550){
+    Mb.MbData[0] = 0; 
+    Mb.Req(MB_FC_WRITE_MULTIPLE_REGISTERS,  752,1,0); //SM_MOVE
+    acc = 0 ;
+    iniciar_set3 = true; 
+
+}
+
+}
+else if (!stop_move){ //si se va a detener movimiento 
+if(acc == 350){
+    Mb.MbData[0] = 1; 
+    Mb.Req(MB_FC_WRITE_MULTIPLE_REGISTERS,  274,1,0); //DRV.STOP
+}
+if(acc == 550){
+    Mb.MbData[0] = 0; 
+    Mb.Req(MB_FC_WRITE_MULTIPLE_REGISTERS,  274,1,0); //DRV.STOP
+    acc = 0 ;
+    iniciar_set3 = true; 
+}
+
+}
+
+} //PolLer4
+
+
+
+
+
+
 void activar_desactivar_potencia(){ //función para activar potencia 
 while(!iniciar_set2){ //loop de configuración 
 Poller_2();
@@ -320,6 +399,16 @@ Mb.MbmRun();
 }
 
 iniciar_set2=false; 
+
+}
+
+void activar_desactivar_movimiento(){ //función para activar potencia 
+while(!iniciar_set3){ //loop de configuración 
+Poller_4();
+Mb.MbmRun();
+}
+
+iniciar_set3=false; 
 
 }
 
