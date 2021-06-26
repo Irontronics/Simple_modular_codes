@@ -2,9 +2,15 @@
 #include <MgsModbus.h> 
 #include <Ethernet.h>
 #include <SPI.h>
+#include <RotaryEncoder.h>
 
 #define  CH1 7  //definir salida control  CH1 para SSR 
 #define  CH2 6  //definir salida control  CH2 para SSR 
+
+//Pines de interrupción a usar 
+RotaryEncoder encoder(A13, A14);
+
+
 
 //variables para separar ajustes
 bool finish1, finish2, finish3, finish4, finish5, finish6, finish7,finish8;  //estos booleanos 
@@ -96,7 +102,19 @@ void setup() {
   Mb.remServerIP[1] = 168;
   Mb.remServerIP[2] = 0;
   Mb.remServerIP[3] = 195;
+
+    // Registros directos del microcontrolador para habilitar interrupciones 
+  PCICR |= (1 << PCIE2);   
+  PCMSK2 |= (1 << PCINT21) | (1 << PCINT22);  
+
 }
+
+//Rutina de servicio a interrupción para los registros de interrupción anteriormente habilitados
+ISR(PCINT2_vect) {
+  encoder.tick(); 
+}
+
+
 
 void loop() {
 
@@ -146,6 +164,8 @@ if(COMANDO_MOVE){ //Si el comando MOVE esta activo entonces
 }
 
 else if (command == 2) { //en espera de selección 
+ 
+  
   digitalWrite(LED_BUILTIN, HIGH);   
   delay(1100);                     
   digitalWrite(LED_BUILTIN, LOW);    
@@ -153,10 +173,30 @@ else if (command == 2) { //en espera de selección
 }
 
 else if (command == 3) { // Programa modo motor  
-  digitalWrite(LED_BUILTIN, HIGH);  
-  delay(80);                    
-  digitalWrite(LED_BUILTIN, LOW);   
-  delay(80);
+   static int pos = 0;
+  static int milis=0;//guarda el instante
+  float deltaT,deltaPos,angSpeed;  
+  int newmilis=0;//inicializa nuevo instante en cero;
+  int newPos = encoder.getPosition(); //Toma valor de posición del encoder 
+  
+  if (pos != newPos) {//si hubo un cambio en la cuenta, entonces: 
+    newmilis=millis();
+    deltaPos=newPos-pos;//calcular el cambio en cuentas, 
+
+    if(deltaPos){//procesar solo deltas positivos, skipeando los overflows
+        deltaT=((newmilis-milis)/1000);//deltat en segundos
+        deltaPos=deltaPos/360;//deltapos en revoluciones ?
+        angSpeed=deltaPos/deltaT;//
+        Serial.print(angSpeed,3);
+        Serial.println();
+        delay(1000);//lanzar lecturas solo cada segundo
+      }
+    milis=newmilis;
+    pos = newPos;
+
+
+  } // if
+  
 }
 
 }
@@ -270,6 +310,7 @@ void serialEvent (){ // lee la cadena proveniente de visual studio HMI
 
   inputString ="";
     }
+    else{inputString = "";}
 
 
 
