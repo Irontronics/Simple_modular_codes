@@ -3,6 +3,14 @@
 #include <Ethernet.h>
 #include <SPI.h>
 #include <RotaryEncoder.h>
+#include <Adafruit_ADS1X15.h>
+#include <Wire.h>
+
+// Crear objeto de la clase
+Adafruit_ADS1115 ads;
+float AverageTemperature = 0;
+int MeasurementsToAverage = 24;
+float factorEscala = 	0.0078125F;
 
 //salidas digitales para freno industrial 
 #define  CH1 7  
@@ -44,6 +52,7 @@ void separar_ajustes_modbus(String Str_complete );
 void activar_desactivar_potencia(); 
 void activar_desactivar_movimiento();
 long organizar_w(long a, long b); 
+float analog_torque_voltage(); 
 
 //acondicionar mensaje recibido de GUI a arduino  
 byte command = 0; 
@@ -85,7 +94,14 @@ void setup() {
   
   //*Registros directos del microcontrolador para habilitar interrupciones 
   PCICR |= (1 << PCIE2);   
-  PCMSK2 |= (1 << PCINT21) | (1 << PCINT22);  
+  PCMSK2 |= (1 << PCINT21) | (1 << PCINT22); 
+
+  // Factor de escala
+  ads.setGain(GAIN_SIXTEEN);
+
+  // Iniciar el ADS1115
+  ads.begin();
+
 }
 
 //Rutina de servicio a interrupción para los registros de interrupción anteriormente habilitados
@@ -102,9 +118,10 @@ void loop() {
       Mb.MbmRun(); 
     }
 
-    if(start   and !command_in){ //Organizar String para GUI Visual studio de datos de monitoreo general 
+    if(start   and !command_in){ //Organizar String para GUI Visual studio de datos de monitoreo general
+      float result_torq_voltage = analog_torque_voltage(); 
       long result1= organizar_w(MSB_W_VL, LSB_W_VL); 
-      mensaje1 = String(result1) + "Z" + String(STATUS_drv) + "Y"  + String(STATUS_stop) + "X" + "\n"; 
+      mensaje1 = String(result1) + "Z" + String(STATUS_drv) + "Y"  + String(STATUS_stop) + "X" + String(result_torq_voltage,4) + "W" + "\n"; 
       Serial.print(mensaje1); 
       tiempo(250);  
       start = false; //flag para volver a tomar lecturas de modbus  
@@ -516,3 +533,14 @@ void Poller_3(){ //Configurar registros modbus
   }
 }
 
+float analog_torque_voltage(){
+
+  for(int i = 0; i < MeasurementsToAverage; ++i)
+  {
+    AverageTemperature += ads.readADC_Differential_0_1();
+    delay(1);
+  }
+  AverageTemperature /= MeasurementsToAverage;
+  AverageTemperature *= factorEscala;
+  return(AverageTemperature);
+}
