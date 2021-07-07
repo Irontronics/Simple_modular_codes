@@ -12,6 +12,9 @@ float AverageTemperature = 0;
 int MeasurementsToAverage = 24;
 float factorEscala = 	0.0078125F;
 
+String mensaje2 = "";  
+bool start2 = false; 
+
 //salidas digitales para freno industrial 
 #define  CH1 7  
 #define  CH2 6  
@@ -53,6 +56,7 @@ void activar_desactivar_potencia();
 void activar_desactivar_movimiento();
 long organizar_w(long a, long b); 
 float analog_torque_voltage(); 
+float Velocidad_torque_futek();
 
 //acondicionar mensaje recibido de GUI a arduino  
 byte command = 0; 
@@ -153,26 +157,52 @@ void loop() {
     tiempo(1100);
   }
 
-  else if (command == 3) { // Modo motor  
-    static int pos = 0;
-    static int milis=0;
-    float deltaT,deltaPos,angSpeed;  
-    int newmilis=0;
-    int newPos = encoder.getPosition(); //Toma valor de posición del encoder 
+  else if (command == 3) { // Modo motor 
+
+
+    if(start2){ //inicio de monitoreo 
+      static int pos = 0;
+      static int milis=0;//guarda el instante
+      float deltaT,deltaPos,angSpeed;  
+      int newmilis=0;//inicializa nuevo instante en cero;
+      int newPos = encoder.getPosition(); //Toma valor de posición del encoder 
   
-    if (pos != newPos) {//si hubo un cambio en la cuenta, entonces: 
-      newmilis=millis();
-      deltaPos=newPos-pos;//calcular el cambio en cuentas, 
-      if(deltaPos){
-        deltaT=((newmilis-milis)/1000);
-        deltaPos=deltaPos/360;
-        angSpeed=deltaPos/deltaT;
-        Serial.print(angSpeed,3);
-        Serial.println();
-        tiempo(1000); 
-      }
-    milis=newmilis;
-    pos = newPos;
+      if (pos != newPos) {//si hubo un cambio en la cuenta, entonces: 
+        newmilis=millis();
+        deltaPos=newPos-pos;//calcular el cambio en cuentas, 
+        if(deltaPos){//procesar solo deltas positivos, skipeando los overflows
+          deltaT=((newmilis-milis)/1000);//deltat en segundos
+          deltaPos=deltaPos/360;//deltapos en revoluciones ?
+          angSpeed=deltaPos/deltaT;//
+          float dato = ads.readADC_Differential_0_1();
+          mensaje2 = String(angSpeed) + "%" + String(dato) + "Y" + "\n"; 
+          Serial.print(mensaje2);
+          //Serial.println();
+          delay(1000);//lanzar lecturas solo cada segundo
+        }
+      milis=newmilis;
+      pos = newPos;
+      } // if
+
+      
+  //for(int i = 0; i < MeasurementsToAverage; ++i)
+ // {
+ //   AverageTemperature += ads.readADC_Differential_0_1();
+ //   delay(1);
+ // }
+ // AverageTemperature /= MeasurementsToAverage;
+ // AverageTemperature *= factorEscala;
+  //Serial.println(AverageTemperature);
+     // float result_torq_voltage = analog_torque_voltage();  //obtenemos el voltaje de torque 
+      //Serial.println(result_torq_voltage);
+     // tiempo(450);
+     // float result_torq_voltage = analog_torque_voltage();  //obtenemos el voltaje de torque 
+     // Serial.println(result_torq_voltage)
+      //7mensaje2 = String(texto) + "Z" + String(result_torq_voltage) + "Y" + "\n";
+      //Serial.print(mensaje2);
+      //tiempo(250);  
+     // start = false; //flag para volver a tomar lecturas de modbus 
+
     }
   } //llave de cierre modo motor 
 }//Loop
@@ -259,6 +289,36 @@ void serialEvent (){ // lee la cadena proveniente de visual studio HMI
         tiempo(300);
         inputString ="";
       }
+
+      else if (inputString =="K2"){  //Iniciar monitoreo modo motor (inicio de prueba)
+        start2 = true; 
+        tiempo(150);
+        inputString ="";
+      }
+
+        else if (inputString =="L2"){  //No entrar en monitoreo de modo motor (paro de prueba)
+        start2 = false; 
+        tiempo(150);
+        inputString ="";
+      }
+
+        else if (inputString =="M2"){  //Activar freno ajustado
+        digitalWrite(CH1, HIGH); //settear freno ajustado
+        tiempo(300);
+        digitalWrite(CH1, LOW); 
+        tiempo(150);
+        inputString ="";
+      }
+        else if (inputString =="N2"){  //Activar freno libre
+        digitalWrite(CH2, HIGH); //settear freno libre
+        tiempo(300);
+        digitalWrite(CH2, LOW); 
+        tiempo(150);
+        inputString ="";
+      }
+
+
+
     } //If de comandos 
     else if (inputString.length() >= 8){ //de lo contrario si cadena recibida es larga (datos de settings modbus GUI to Arduino)
       separar_ajustes_modbus(inputString); //a separar ajustes 
@@ -543,4 +603,27 @@ float analog_torque_voltage(){
   AverageTemperature /= MeasurementsToAverage;
   AverageTemperature *= factorEscala;
   return(AverageTemperature);
+}
+
+float Velocidad_torque_futek(){
+      static int pos = 0;
+      static int milis=0;
+      float deltaT,deltaPos,angSpeed;  
+      int newmilis=0;
+      int newPos = encoder.getPosition(); //Toma valor de posición del encoder 
+  
+      if (pos != newPos) {//si hubo un cambio en la cuenta, entonces: 
+        newmilis=millis();
+        deltaPos=newPos-pos;//calcular el cambio en cuentas, 
+        if(deltaPos){
+          deltaT=((newmilis-milis)/1000);
+          deltaPos=deltaPos/360;
+          angSpeed=deltaPos/deltaT;
+          //return angSpeed; 
+          Serial.println(angSpeed,3); 
+          tiempo(1000); 
+        }
+      milis=newmilis;
+      pos = newPos;
+      }
 }

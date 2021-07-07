@@ -1,5 +1,7 @@
 //Código del encoder Futek TRS605  para Arduino Mega
 #include <RotaryEncoder.h>
+#include <Wire.h>
+#include <Adafruit_ADS1X15.h>
 
 //Pines de interrupción a usar 
 RotaryEncoder encoder(A13, A14);
