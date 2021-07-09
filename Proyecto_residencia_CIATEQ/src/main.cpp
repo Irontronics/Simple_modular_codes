@@ -223,6 +223,9 @@ void serialEvent (){ //*lee la cadena proveniente de visual studio HMI
       }
 
       else if (inputString =="D2"){ //*Modo motor 
+        digitalWrite(CH2, HIGH); //*settear freno en modo libre al inicio 
+        tiempo(300);
+        digitalWrite(CH2, LOW);
         inputString ="";
         command = 3;  
       }
